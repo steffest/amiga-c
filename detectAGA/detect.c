@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <proto/exec.h>
 #include <graphics/gfxbase.h>
+#include <exec/execbase.h>
 
 struct GfxBase *GraphicsBase;
+extern struct ExecBase *SysBase;
 
 main()
 {
@@ -12,6 +14,9 @@ main()
     // V37 is found in kickstart 2.04
     // V34 in kickstart 1.3
     int version = 39;
+
+    printf("Kickstart v%d, ", SysBase->LibNode.lib_Version);
+
     GraphicsBase=(struct GfxBase *)OpenLibrary("graphics.library",version);
 
     if (GraphicsBase){
