@@ -28,8 +28,11 @@ void drawTextBox(char *text , int x, int y, int w, int h,int textColorPen){
     int left;
     int top;
 
+    //TODO: apparently there's a textlength function?
+    //http://amigadev.elowar.com/read/ADCD_2.1/Libraries_Manual_guide/node03DA.html
     top = y + (h+windowContext->Font->tf_Baseline)/2;
     left = x + (w-(windowContext->Font->tf_XSize*strlen(text)))/2;
+    
     SetAPen(windowContext, textColorPen);
     SetDrMd(windowContext, JAM1);
     Move(windowContext, left, top);

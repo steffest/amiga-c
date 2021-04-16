@@ -11,14 +11,14 @@
 
 int main() {
     struct NewScreen screenProperties = {
-     0,0,SCREENWIDTH,SCREENHEIGHT,PLANES,
-     DETAILPEN, BLOCKPEN,
-     LORES,
-     CUSTOMSCREEN | CUSTOMBITMAP,
-     NULL,
-     "My Screen",
-     NULL,
-     NULL
+         0,0,SCREENWIDTH,SCREENHEIGHT,PLANES,
+         DETAILPEN, BLOCKPEN,
+         LORES,
+         CUSTOMSCREEN | CUSTOMBITMAP,
+         NULL,
+         "My Screen",
+         NULL,
+         NULL
      };
      struct Screen *myScreen;
      myScreen = OpenScreen(&screenProperties);

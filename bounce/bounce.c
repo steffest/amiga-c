@@ -13,10 +13,27 @@
 #include <proto/exec.h>
 #include <intuition/screens.h>
 #include <intuition/intuition.h>
+#include <hardware/custom.h>
 #include <stdio.h>
+
+typedef struct BitMap tBitMap;
+__far extern struct Custom custom;
+volatile UBYTE *custom_vhposr= (volatile UBYTE *) 0xdff006;
+
+#include <exec/types.h>
 
 #define SCREENWIDTH 320
 #define SCREENHEIGHT 200
+
+
+// BltCon0 channel enable bits
+#define USEA 0x800
+#define USEB 0x400
+#define USEC 0x200
+#define USED 0x100
+
+
+
 
 #define PLANES 3 // 8 colors
 #define LORES 0
@@ -60,6 +77,7 @@ void drawTile(UBYTE index, UBYTE x, UBYTE y);
 void bufferToScreen(void);
 void addBunny(void);
 struct MouseInfo getMouseInfo(struct Window *win);
+char _blitRect(tBitMap *pDst, short wDstX, short wDstY, short wWidth, short wHeight,unsigned char ubColor, unsigned short uwLine, char *szFile);
 
 int main() {
     int i;
@@ -81,6 +99,11 @@ int main() {
 
     while (!done){
 
+    	while (*custom_vhposr != 0xff) ; // wait for vblank
+
+
+    	//BeginRefresh(window);
+
         for( i = 0; i < PLANES; i++ )
         {
             BltClear( screenBitmap.Planes[ i ], RASSIZE( SCREENWIDTH, SCREENHEIGHT ), 0 );
@@ -99,6 +122,8 @@ int main() {
             drawTile(0,bunnies[i].x,bunnies[i].y);
 
         }
+
+        //EndRefresh(window,TRUE);
 
         //bufferToScreen();
 
@@ -205,6 +230,8 @@ void drawTile(UBYTE index, UBYTE x, UBYTE y){
             0xFF,            // All bitplanes.
             NULL );          // No temporary storage.
 
+
+          //_blitRect(&screenBitmap, x, y, 20, 20,1, 0, 0);
 
 }
 
@@ -353,7 +380,7 @@ BOOL setup(){
     RectFill(&screenContext, 0, 0, SCREENWIDTH, SCREENHEIGHT);
 
 
-    // init offscreen bitmap to hold our sprites
+    // init offscreen bitmap to hold our sprite
     InitRastPort(&spriteContext);
     spriteContext.BitMap = &spriteBitmap;
     InitBitMap(&spriteBitmap, PLANES, 20, 40);
@@ -404,4 +431,74 @@ void cleanup(void){
 
     if(IntuitionBase) CloseLibrary((struct Library *)IntuitionBase);
 
+}
+
+
+
+/**
+ * Fills rectangular area with selected color
+ * A - rectangle mask, read disabled
+ * C - destination read
+ * D - destination write
+ * Each bitplane has minterm depending if rectangular area should be filled or erased:
+ * 	- fill: D = A+C
+ * - erase: D = (~A)*C
+ */
+char _blitRect(tBitMap *pDst, short wDstX, short wDstY, short wWidth, short wHeight,unsigned char ubColor, unsigned short uwLine, char *szFile) {
+
+
+	// Helper vars
+	UWORD uwBlitWords;
+	UWORD uwBlitWidth;
+	ULONG ulDstOffs;
+	UBYTE ubDstDelta;
+	UBYTE ubMinterm;
+	UBYTE ubPlane;
+	// Blitter register values
+	UWORD uwBltCon0;
+	UWORD uwBltCon1;
+	UWORD uwFirstMask;
+	UWORD uwLastMask;
+	WORD wSrcModulo;
+	WORD wDstModulo;
+
+	ubDstDelta = wDstX & 0xF;
+	uwBlitWidth = (wWidth+ubDstDelta+15) & 0xFFF0;
+	uwBlitWords = uwBlitWidth >> 4;
+
+	uwFirstMask = 0xFFFF >> ubDstDelta;
+	uwLastMask = 0xFFFF << (uwBlitWidth-(wWidth+ubDstDelta));
+	uwBltCon1 = 0;
+	ulDstOffs = pDst->BytesPerRow * wDstY + (wDstX>>3);
+	wDstModulo = pDst->BytesPerRow - (uwBlitWords<<1);
+	uwBltCon0 = USEC|USED;
+
+	WaitBlit();
+	custom.bltcon1 = uwBltCon1;
+	custom.bltafwm = uwFirstMask;
+	custom.bltalwm = uwLastMask;
+
+	custom.bltcmod = wDstModulo;
+	custom.bltdmod = wDstModulo;
+	custom.bltadat = 0xFFFF;
+	custom.bltbdat = 0;
+	ubPlane = 0;
+
+	do {
+		if(ubColor & 1)
+			ubMinterm = 0xFA;
+		else
+			ubMinterm = 0x0A;
+		WaitBlit();
+		custom.bltcon0 = uwBltCon0 | ubMinterm;
+		// This hell of a casting must stay here or else large offsets get bugged!
+		custom.bltcpt  = (UBYTE*)(((ULONG)(pDst->Planes[ubPlane])) + ulDstOffs);
+		custom.bltdpt  = (UBYTE*)(((ULONG)(pDst->Planes[ubPlane])) + ulDstOffs);
+		custom.bltsize = (wHeight << 6) | uwBlitWords;
+		ubColor >>= 1;
+		++ubPlane;
+	}	while(ubPlane != pDst->Depth);
+
+
+	return 1;
 }
