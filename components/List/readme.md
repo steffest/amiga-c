@@ -1,4 +1,4 @@
-#List & Dictionary Component
+# List & Dictionary Component
 
 Something like a dynamic array of strings in plain C  
 Loosly based on code by David Tritscher found in http://www.emeraldmines.net/?emeraldx11  
